@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>贪食蛇</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐍</text></svg>">
+    <style>
+        body {
+            background-color: #1a202c;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center; 
+            height: 100vh;
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            touch-action: none;
+            overflow: hidden;
+        }
+
+        #main-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* 顶部栏 */
+        .header-bar {
+            width: 100%; 
+            box-sizing: border-box;
+            padding: 0 10px;
+            background-color: #2d3748;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            height: 44px;
+            border-radius: 4px 4px 0 0; 
+            border: 2px solid #4a5568;
+            border-bottom: none; 
+        }
+
+        .stat-item { white-space: nowrap; display: flex; align-items: center;}
+        .label { color: #a0aec0; margin-right: 4px; font-size: 0.8rem;}
+        .value { font-weight: bold; }
+        
+        .score-val { color: #f6e05e; } 
+        .time-val { color: #fc8181; min-width: 40px; text-align: right;} 
+        .name-val { color: #63b3ed; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;} 
+        .top-val { color: #f6ad55; } 
+
+        /* 画布 */
+        canvas {
+            background-color: #202a33;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            border: 2px solid #4a5568; 
+            border-radius: 0 0 4px 4px;
+            display: block;
+        }
+
+        /* 弹窗 */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.88);
+            z-index: 999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .modal-content {
+            background: #2d3748;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            width: 80%;
+            max-width: 320px;
+            border: 1px solid #4a5568;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+
+        .title-win { color: #f1c40f; text-shadow: 0 0 10px rgba(241, 196, 15, 0.5); }
+        .title-lose { color: #fc8181; }
+
+        h2 { margin: 0 0 20px 0; font-size: 1.5rem; text-transform: uppercase; letter-spacing: 1px;}
+        
+        input, select {
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #4a5568;
+            width: 90%;
+            margin-bottom: 15px;
+            background: #1a202c;
+            color: white;
+            text-align: center;
+            font-size: 1rem;
+            outline: none;
+        }
+        input:focus { border-color: #63b3ed; }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 30px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            color: white;
+            transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.98); }
+
+        .btn-primary { background-color: #0052d9; box-shadow: 0 4px 15px rgba(0, 82, 217, 0.4); }
+        .btn-secondary { background-color: #4a5568; margin-top: 8px; color: #cbd5e0; }
+
+        /* 滚动条 */
+        .rank-list {
+            list-style: none;
+            padding: 0;
+            margin: 15px 0;
+            max-height: 140px;
+            overflow-y: auto;
+            text-align: left;
+            font-size: 0.85rem;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            scrollbar-width: thin; 
+            scrollbar-color: #4a5568 transparent; 
+        }
+
+        .rank-list::-webkit-scrollbar { width: 6px; }
+        .rank-list::-webkit-scrollbar-thumb { background-color: #4a5568; border-radius: 3px; }
+        .rank-list::-webkit-scrollbar-track { background: transparent; }
+
+        .rank-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .rank-item:last-child { border-bottom: none; }
+
+    </style>
+</head>
+<body>
+
+    <div id="main-container">
+        <div class="header-bar" id="headerBar">
+            <div class="stat-item">
+                <span class="label">苹果:</span><span class="value score-val" id="currentScore">0/0</span>
+            </div>
+            <div class="stat-item">
+                <span class="label">时间:</span><span class="value time-val" id="gameTimer">0秒</span>
+            </div>
+            <div class="stat-item">
+                <span class="value name-val" id="displayName">---</span>
+            </div>
+            <div class="stat-item">
+                <span class="label">榜首:</span><span class="value top-val" id="topScore">0</span>
+            </div>
+        </div>
+
+        <canvas id="gc"></canvas>
+    </div>
+
+    <div class="modal-overlay" id="startModal">
+        <div class="modal-content">
+            <h2 style="color:white;">🐍 贪食蛇</h2>
+            <input type="text" id="startNameInput" placeholder="请输入您的姓名" maxlength="6">
+            <select id="difficultySelect">
+                <option value="easy">简单 (目标: 50苹果)</option>
+                <option value="hard" selected>困难 (目标: 100苹果)</option>
+                <option value="hell">地狱 (目标: 200苹果)</option>
+            </select>
+            <button class="btn-primary" onclick="initGame()">开始游戏</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="endModal" style="display: none;">
+        <div class="modal-content">
+            <h2 id="endTitle" class="title-lose">GAME OVER</h2>
+            <div style="margin-bottom: 20px; font-size: 1.1rem;">
+                苹果: <span id="finalScore" style="color:#f6e05e; font-weight:bold;">0/0</span>
+                <span style="margin:0 8px; color:#4a5568">|</span>
+                时长: <span id="finalDuration" style="color:#cbd5e0">0秒</span>
+            </div>
+            
+            <ul class="rank-list" id="rankListUl"></ul>
+
+            <button class="btn-primary" onclick="showStartMenu()">返回主菜单</button>
+            <button class="btn-secondary" onclick="downloadJSON()">导出数据</button>
+        </div>
+    </div>
+
+<script>
+    const AudioSys = {
+        ctx: null,
+        init: function() {
+            if (!this.ctx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioContext();
+            }
+            if (this.ctx.state === 'suspended') {
+                this.ctx.resume();
+            }
+        },
+        playTone: function(freq, type, duration, vol = 0.1) {
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+            gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + duration);
+        },
+        playEat: function() {
+            this.playTone(600, 'sine', 0.1, 0.15);
+            setTimeout(() => this.playTone(900, 'sine', 0.1, 0.15), 60);
+        },
+        playDie: function() {
+            this.playTone(150, 'sawtooth', 0.4, 0.2);
+            setTimeout(() => this.playTone(100, 'sawtooth', 0.4, 0.2), 100);
+        },
+        playWin: function() {
+            const notes = [523.25, 659.25, 783.99, 1046.50]; 
+            notes.forEach((freq, i) => {
+                setTimeout(() => this.playTone(freq, 'triangle', 0.2, 0.2), i * 150);
+            });
+            setTimeout(() => this.playTone(1046.50, 'sine', 0.6, 0.2), 600);
+        }
+    };
+
+    const canvas = document.getElementById('gc');
+    const ctx = canvas.getContext('2d');
+    const headerBar = document.getElementById('headerBar');
+    const currentScoreEl = document.getElementById('currentScore');
+    const gameTimerEl = document.getElementById('gameTimer');
+    const displayNameEl = document.getElementById('displayName');
+    const topScoreEl = document.getElementById('topScore');
+    const startModal = document.getElementById('startModal');
+    const endModal = document.getElementById('endModal');
+    const endTitleEl = document.getElementById('endTitle');
+    const startNameInput = document.getElementById('startNameInput');
+    const difficultySelect = document.getElementById('difficultySelect');
+
+    let tileCount = 20; 
+    let gridSize = 0;   
+    let speed = 100;
+    let targetScore = 0; 
+    
+    let playerX = 10, playerY = 10;
+    let foodX = 5, foodY = 5;
+    let velocityX = 0, velocityY = 0;
+    let trail = [];
+    let tail = 5;
+    let score = 0;
+    let gameInterval = null;
+    let timerInterval = null;
+    let gameDurationSec = 0;
+    let hasStartedMoving = false;
+    let currentPlayerName = "玩家";
+    let currentDifficultyLabel = "困难";
+    const COLOR_SNAKE_HEAD = '#0052d9'; 
+    const COLOR_SNAKE_BODY = 'rgba(0, 82, 217, 0.6)'; 
+    const COLOR_FOOD = '#ff5722'; 
+
+    window.onload = () => {
+        resizeCanvas();
+        loadSettings();
+        updateTopScore();
+        window.addEventListener('resize', resizeCanvas);
+        setupControls();
+    };
+
+    // --- 时间格式化函数 ---
+    function formatTimeStr(seconds) {
+        if (seconds < 60) {
+            return seconds + "秒";
+        } else {
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            return `${m}分${s}秒`;
+        }
+    }
+
+    function resizeCanvas() {
+        const winW = window.innerWidth;
+        const winH = window.innerHeight;
+        const maxWidth = winW - 20; 
+        const maxHeight = winH - 80; 
+        const size = Math.floor(Math.min(maxWidth, maxHeight));
+        canvas.width = size;
+        canvas.height = size;
+        headerBar.style.width = size + 'px';
+        gridSize = size / tileCount;
+        if (!hasStartedMoving && velocityX === 0) {
+            render();
+            drawHint();
+        }
+    }
+
+    function initGame() {
+        AudioSys.init();
+        
+        const name = startNameInput.value.trim();
+        if (name) currentPlayerName = name;
+        localStorage.setItem('snakeLastPlayer', currentPlayerName);
+        const diff = difficultySelect.value;
+        
+        // 设置新目标: 50 / 100 / 200
+        if (diff === 'easy') { 
+            speed = 180; 
+            currentDifficultyLabel = "简单"; 
+            targetScore = 50 * 10; 
+        } else if (diff === 'hard') { 
+            speed = 100; 
+            currentDifficultyLabel = "困难"; 
+            targetScore = 100 * 10; 
+        } else { 
+            speed = 50; 
+            currentDifficultyLabel = "地狱"; 
+            targetScore = 200 * 10; 
+        }
+
+        displayNameEl.innerText = currentPlayerName;
+        startModal.style.display = 'none';
+        endModal.style.display = 'none';
+        
+        resetGameData();
+        
+        if (gameInterval) clearInterval(gameInterval);
+        gameInterval = setInterval(gameLoop, speed);
+        if (timerInterval) clearInterval(timerInterval);
+        
+        // 重置时间
+        gameDurationSec = 0;
+        gameTimerEl.innerText = formatTimeStr(0);
+        
+        timerInterval = setInterval(() => {
+            if (hasStartedMoving) {
+                gameDurationSec++;
+                // 使用格式化函数
+                gameTimerEl.innerText = formatTimeStr(gameDurationSec);
+            }
+        }, 1000);
+    }
+
+    function resetGameData() {
+        playerX = Math.floor(tileCount / 2);
+        playerY = Math.floor(tileCount / 2);
+        velocityX = 0; velocityY = 0;
+        hasStartedMoving = false;
+        
+        trail = []; 
+        tail = 5;
+        score = 0;
+        updateScoreDisplay();
+
+        spawnFood();
+        render(); 
+        drawHint();
+    }
+
+    function updateScoreDisplay() {
+        const currentApples = score / 10;
+        const targetApples = targetScore / 10;
+        currentScoreEl.innerText = `${currentApples}/${targetApples}`;
+    }
+
+    function gameLoop() {
+        if (!hasStartedMoving) {
+            render();
+            drawHint();
+            return;
+        }
+        playerX += velocityX;
+        playerY += velocityY;
+        
+        if (playerX < 0 || playerX > tileCount - 1 || playerY < 0 || playerY > tileCount - 1) {
+            AudioSys.playDie();
+            handleEnd(false);
+            return;
+        }
+        
+        trail.push({ x: playerX, y: playerY });
+        while (trail.length > tail) trail.shift();
+        
+        for (let i = 0; i < trail.length - 1; i++) {
+            if (trail[i].x === playerX && trail[i].y === playerY) {
+                AudioSys.playDie();
+                handleEnd(false);
+                return;
+            }
+        }
+        
+        if (Math.abs(playerX - foodX) < 0.1 && Math.abs(playerY - foodY) < 0.1) { 
+             AudioSys.playEat();
+             tail++;
+             score += 10;
+             updateScoreDisplay(); 
+             
+             if (score >= targetScore) {
+                 handleEnd(true);
+                 return;
+             }
+             
+             spawnFood();
+        }
+        render();
+    }
+
+    function render() {
+        ctx.fillStyle = '#202a33';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+        ctx.lineWidth = 1;
+        for(let i=0; i<=tileCount; i++) {
+            ctx.beginPath(); ctx.moveTo(i*gridSize, 0); ctx.lineTo(i*gridSize, canvas.height); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, i*gridSize); ctx.lineTo(canvas.width, i*gridSize); ctx.stroke();
+        }
+        ctx.fillStyle = COLOR_FOOD;
+        const fCx = foodX * gridSize + gridSize/2;
+        const fCy = foodY * gridSize + gridSize/2;
+        const radius = gridSize/2 - 2;
+        ctx.beginPath(); ctx.arc(fCx, fCy, radius, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.beginPath(); ctx.arc(fCx - 2, fCy - 2, radius/3, 0, Math.PI*2); ctx.fill();
+        
+        if (!hasStartedMoving) {
+             ctx.fillStyle = COLOR_SNAKE_HEAD;
+             ctx.fillRect(playerX * gridSize + 1, playerY * gridSize + 1, gridSize - 2, gridSize - 2);
+             return;
+        }
+
+        for (let i = 0; i < trail.length; i++) {
+            if (i === trail.length - 1) ctx.fillStyle = COLOR_SNAKE_HEAD;
+            else ctx.fillStyle = COLOR_SNAKE_BODY;
+            const gap = 1; 
+            ctx.fillRect(trail[i].x * gridSize + gap, trail[i].y * gridSize + gap, gridSize - gap*2, gridSize - gap*2);
+        }
+    }
+
+    function drawHint() {
+        ctx.fillStyle = "white";
+        ctx.font = "18px sans-serif";
+        ctx.textAlign = "center";
+        ctx.shadowColor = "black";
+        ctx.shadowBlur = 4;
+        ctx.fillText("滑动屏幕 或 按方向键", canvas.width/2, canvas.height/2 - 40); 
+        ctx.fillText("开启挑战", canvas.width/2, canvas.height/2 - 10); 
+        ctx.shadowBlur = 0;
+    }
+
+    function spawnFood() {
+        foodX = Math.floor(Math.random() * tileCount);
+        foodY = Math.floor(Math.random() * tileCount);
+        for (let t of trail) {
+            if (t.x === foodX && t.y === foodY) { spawnFood(); return; }
+        }
+        if (!hasStartedMoving && foodX === playerX && foodY === playerY) spawnFood();
+    }
+
+    function handleEnd(isWin) {
+        clearInterval(gameInterval);
+        clearInterval(timerInterval);
+        
+        if (isWin) {
+            AudioSys.playWin();
+            endTitleEl.innerText = "🏆 通关成功！";
+            endTitleEl.className = "title-win";
+        } else {
+            endTitleEl.innerText = "💀 GAME OVER";
+            endTitleEl.className = "title-lose";
+        }
+        
+        saveRecord(isWin);
+        
+        const currentApples = score / 10;
+        const targetApples = targetScore / 10;
+        document.getElementById('finalScore').innerText = `${currentApples}/${targetApples}`;
+        // 结算也使用格式化时间
+        document.getElementById('finalDuration').innerText = formatTimeStr(gameDurationSec);
+        
+        endModal.style.display = 'flex';
+        renderRankList();
+        updateTopScore();
+    }
+
+    function showStartMenu() {
+        endModal.style.display = 'none';
+        startModal.style.display = 'flex';
+        resetGameData();
+    }
+
+    function setupControls() {
+        document.addEventListener('keydown', (e) => {
+            if(e.target.tagName === 'INPUT') return;
+            if(e.keyCode >= 37 && e.keyCode <= 40) AudioSys.init();
+            switch(e.keyCode) {
+                case 37: handleInput(-1, 0); break; 
+                case 38: handleInput(0, -1); break; 
+                case 39: handleInput(1, 0); break; 
+                case 40: handleInput(0, 1); break; 
+            }
+        });
+        let touchStartX = 0, touchStartY = 0;
+        document.addEventListener('touchstart', () => AudioSys.init(), {once:true});
+        canvas.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+            e.preventDefault(); 
+        }, {passive: false});
+        canvas.addEventListener('touchend', (e) => {
+            const touchEndX = e.changedTouches[0].screenX;
+            const touchEndY = e.changedTouches[0].screenY;
+            const dx = touchEndX - touchStartX;
+            const dy = touchEndY - touchStartY;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (Math.abs(dx) > 20) { if (dx > 0) handleInput(1, 0); else handleInput(-1, 0); }
+            } else {
+                if (Math.abs(dy) > 20) { if (dy > 0) handleInput(0, 1); else handleInput(0, -1); }
+            }
+            e.preventDefault();
+        }, {passive: false});
+    }
+
+    function handleInput(dx, dy) {
+        if (!hasStartedMoving) {
+            hasStartedMoving = true;
+            velocityX = dx; velocityY = dy;
+            for(let i=1; i<tail; i++) {
+                trail.push({
+                    x: playerX - dx*i,
+                    y: playerY - dy*i
+                });
+            }
+            trail.push({x: playerX, y: playerY});
+            return;
+        }
+        if (dx === 1 && velocityX === -1) return;
+        if (dx === -1 && velocityX === 1) return;
+        if (dy === 1 && velocityY === -1) return;
+        if (dy === -1 && velocityY === 1) return;
+        velocityX = dx; velocityY = dy;
+    }
+
+    function saveRecord(isWin) {
+        if (score === 0) return;
+        let history = JSON.parse(localStorage.getItem('snakeDataJSON')) || [];
+        let diffText = currentDifficultyLabel;
+        if (isWin) diffText += " (通关)";
+
+        let existing = history.find(r => r.name === currentPlayerName && r.difficulty === currentDifficultyLabel);
+        if (existing) {
+            if (score > existing.score) {
+                existing.score = score;
+                existing.duration = gameDurationSec;
+                existing.date = new Date().toLocaleString();
+                if (isWin) existing.difficultyLabel = diffText; 
+            } else if (isWin && !existing.difficultyLabel?.includes("通关")) {
+                existing.difficultyLabel = diffText;
+            }
+        } else {
+            history.push({
+                name: currentPlayerName, 
+                score: score, 
+                difficulty: currentDifficultyLabel,
+                difficultyLabel: diffText, 
+                duration: gameDurationSec, 
+                date: new Date().toLocaleString()
+            });
+        }
+        history.sort((a, b) => b.score - a.score);
+        if (history.length > 20) history.length = 20;
+        localStorage.setItem('snakeDataJSON', JSON.stringify(history));
+    }
+
+    function loadSettings() {
+        const saved = localStorage.getItem('snakeLastPlayer');
+        if (saved) { startNameInput.value = saved; displayNameEl.innerText = saved; }
+    }
+
+    function updateTopScore() {
+        let history = JSON.parse(localStorage.getItem('snakeDataJSON')) || [];
+        if (history.length > 0) topScoreEl.innerText = (history[0].score / 10);
+    }
+
+    function renderRankList() {
+        const list = document.getElementById('rankListUl');
+        let history = JSON.parse(localStorage.getItem('snakeDataJSON')) || [];
+        list.innerHTML = '';
+        if (history.length === 0) { list.innerHTML = '<li style="color:#718096; text-align:center; padding:10px;">暂无记录</li>'; return; }
+        history.forEach((item, idx) => {
+            // 使用格式化时间
+            const durationText = item.duration !== undefined ? formatTimeStr(item.duration) : '未知';
+            const showDiff = item.difficultyLabel || item.difficulty;
+            const apples = item.score / 10;
+            
+            const li = document.createElement('li');
+            li.className = 'rank-item';
+            li.innerHTML = `
+                <div style="display:flex; flex-direction:column;">
+                    <span style="color:#e2e8f0">#${idx+1} ${item.name}</span>
+                    <span style="font-size:0.75rem; color:#718096">${showDiff} · ${durationText}</span>
+                </div>
+                <span style="color:#f6e05e; font-weight:bold; font-size:1.1rem">${apples}</span>
+            `;
+            list.appendChild(li);
+        });
+    }
+
+    function downloadJSON() {
+        const data = localStorage.getItem('snakeDataJSON');
+        if (!data) return alert("无数据");
+        const blob = new Blob([data], {type: "application/json"});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = "snake_data.json";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+</script>
+</body>
+</html>
